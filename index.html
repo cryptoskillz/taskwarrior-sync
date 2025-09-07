@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Task Viewer</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    .status-group {
+      margin-bottom: 40px;
+    }
+    .task {
+      background: #fff;
+      padding: 15px;
+      margin: 10px 0;
+      border-left: 5px solid #007BFF;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    .project {
+      font-weight: bold;
+      color: #333;
+    }
+    .urgency {
+      float: right;
+      font-size: 0.9em;
+      color: #888;
+    }
+    .due {
+      font-size: 0.9em;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <h1>Task Viewer</h1>
+  <div id="tasks-container"></div>
+
+  <script>
+    // Load JSON from local tasks.json
+    fetch('tasks.json')
+      .then(res => res.json())
+      .then(data => renderTasks(data))
+      .catch(err => console.error('Error loading JSON:', err));
+
+    function renderTasks(tasks) {
+      const grouped = {};
+
+      tasks.forEach(task => {
+        const status = task.status || 'unknown';
+        if (!grouped[status]) grouped[status] = [];
+        grouped[status].push(task);
+      });
+
+      const container = document.getElementById('tasks-container');
+      container.innerHTML = '';
+
+      for (const [status, taskList] of Object.entries(grouped)) {
+        // Sort by urgency descending
+        taskList.sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
+
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'status-group';
+
+        const header = document.createElement('h2');
+        header.textContent = `${status.toUpperCase()} (${taskList.length})`;
+        groupDiv.appendChild(header);
+
+        taskList.forEach(task => {
+          const taskDiv = document.createElement('div');
+          taskDiv.className = 'task';
+
+          const desc = document.createElement('div');
+          desc.textContent = task.description;
+          taskDiv.appendChild(desc);
+
+          const meta = document.createElement('div');
+          meta.className = 'meta';
+
+          const project = document.createElement('span');
+          project.className = 'project';
+          project.textContent = task.project || 'No project';
+
+          const urgency = document.createElement('span');
+          urgency.className = 'urgency';
+          urgency.textContent = `Urgency: ${task.urgency?.toFixed(2) || '0.00'}`;
+
+          const due = document.createElement('div');
+          due.className = 'due';
+          if (task.due) {
+            due.textContent = `Due: ${formatDate(task.due)}`;
+          }
+
+          taskDiv.appendChild(project);
+          taskDiv.appendChild(urgency);
+          if (task.due) taskDiv.appendChild(due);
+
+          groupDiv.appendChild(taskDiv);
+        });
+
+        container.appendChild(groupDiv);
+      }
+    }
+
+    function formatDate(isoStr) {
+      // Format TaskWarrior datetime (e.g., "20250818T170000Z")
+      const date = new Date(isoStr);
+      return date.toLocaleString();
+    }
+  </script>
+</body>
+</html>
