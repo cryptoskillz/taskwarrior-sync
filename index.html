@@ -3,56 +3,271 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Task Viewer</title>
+  <title>Task Viewer (+ Filters)</title>
   <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --ring: rgba(37, 99, 235, 0.35);
+    }
+    * { box-sizing: border-box; }
     body {
-      font-family: sans-serif;
-      background: #f4f4f4;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: var(--bg);
       margin: 0;
-      padding: 20px;
+      color: var(--ink);
+      line-height: 1.45;
     }
-    h1 {
-      text-align: center;
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: linear-gradient(#fff,#fff) padding-box,
+                  linear-gradient(90deg, rgba(37,99,235,.12), rgba(99,102,241,.12)) border-box;
+      border-bottom: 1px solid #e5e7eb;
     }
-    .status-group {
-      margin-bottom: 40px;
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    h1 { margin: 6px 0 14px; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+
+    /* Controls */
+    .controls { background: var(--card); border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .field { display: grid; gap: 6px; }
+    .field label { font-size: 12px; text-transform: uppercase; color: var(--muted); letter-spacing: .06em; }
+    select, input[type="text"], input[type="date"] {
+      min-height: 36px; border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px 10px; outline: none; background: #fff;
     }
-    .task {
-      background: #fff;
-      padding: 15px;
-      margin: 10px 0;
-      border-left: 5px solid #007BFF;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-    }
-    .project {
-      font-weight: bold;
-      color: #333;
-    }
-    .urgency {
-      float: right;
-      font-size: 0.9em;
-      color: #888;
-    }
-    .due {
-      font-size: 0.9em;
-      color: #999;
-    }
+    select:focus, input:focus { box-shadow: 0 0 0 4px var(--ring); border-color: #c7d2fe; }
+
+    .chipset { display: flex; gap: 8px; flex-wrap: wrap; max-height: 120px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px; background: #fff; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e5e7eb; border-radius: 999px; padding: 6px 10px; font-size: 13px; background: #fff; }
+    .chip input { accent-color: var(--primary); }
+    .toggles { display: flex; gap: 14px; flex-wrap: wrap; }
+
+    /* Groups & tasks */
+    main { padding: 14px 0 60px; }
+    .status-group { margin: 26px 0 40px; }
+    .status-title { display: flex; align-items: baseline; gap: 12px; margin: 0 0 10px; }
+    .status-title h2 { margin: 0; font-size: 18px; letter-spacing: .02em; }
+    .status-title .count { color: var(--muted); font-size: 13px; }
+
+    .task { background: var(--card); padding: 14px; margin: 12px 0; border-left: 5px solid var(--primary); border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); position: relative; }
+    .task .desc { font-weight: 600; margin-bottom: 6px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; font-size: 13px; color: var(--muted); }
+    .badge { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; border-radius: 999px; padding: 2px 8px; font-weight: 600; font-size: 12px; }
+    .urgency { position: absolute; right: 12px; top: 10px; font-size: 12px; color: #6b7280; }
+    .overdue { border-left-color: #ef4444; }
+    .due-txt.overdue { color: #ef4444; font-weight: 700; }
+
+    .empty { color: var(--muted); padding: 20px; border: 1px dashed #e5e7eb; background: #fff; border-radius: 12px; }
   </style>
 </head>
 <body>
-  <h1>Task Viewer</h1>
-  <div id="tasks-container"></div>
+  <header>
+    <div class="wrap">
+      <h1>Task Viewer</h1>
+      <div class="controls">
+        <div class="row">
+          <div class="field" style="min-width: 220px; flex: 1 1 260px;">
+            <label>Search</label>
+            <input id="q" type="text" placeholder="Description contains…" />
+          </div>
+          <div class="field" style="width: 180px;">
+            <label>Sort</label>
+            <select id="sort">
+              <option value="urgency-desc">Urgency (high → low)</option>
+              <option value="due-asc">Due (soonest first)</option>
+              <option value="entry-desc">Newly added</option>
+            </select>
+          </div>
+          <div class="field" style="width: 160px;">
+            <label>Due filter</label>
+            <select id="dueFilter">
+              <option value="all">All</option>
+              <option value="today">Due Today</option>
+              <option value="overdue">Overdue</option>
+              <option value="week">Due in 7 days</option>
+            </select>
+          </div>
+          <div class="field" style="width: 160px;">
+            <label>Min urgency</label>
+            <input id="minUrgency" type="number" step="0.01" placeholder="e.g. 1" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <div class="field" style="flex: 1 1 420px; min-width: 260px;">
+            <label>Projects</label>
+            <div id="projects" class="chipset"></div>
+          </div>
+          <div class="field" style="width: 320px;">
+            <label>Status</label>
+            <div class="toggles">
+              <label class="chip"><input type="checkbox" class="status" value="pending" checked> pending</label>
+              <label class="chip"><input type="checkbox" class="status" value="completed" checked> completed</label>
+              <label class="chip"><input type="checkbox" class="status" value="unknown" checked> unknown</label>
+            </div>
+          </div>
+          <div class="field" style="width: 180px; align-self: end;">
+            <button id="reset" style="width:100%; min-height:36px; border:1px solid #e5e7eb; border-radius:10px; background:#fff;">Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="tasks-container"></div>
+  </main>
 
   <script>
+    // ---- Utilities ----
+    function parseTWDate(isoStr) {
+      // Accepts Taskwarrior basic format: YYYYMMDDTHHMMSSZ
+      if (!isoStr) return null;
+      if (/^\d{8}T\d{6}Z$/.test(isoStr)) {
+        const y = isoStr.slice(0,4);
+        const m = isoStr.slice(4,6);
+        const d = isoStr.slice(6,8);
+        const hh = isoStr.slice(9,11);
+        const mm = isoStr.slice(11,13);
+        const ss = isoStr.slice(13,15);
+        return new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss}Z`);
+      }
+      const d = new Date(isoStr);
+      return isNaN(d) ? null : d;
+    }
+    function formatDate(isoStr) {
+      const d = parseTWDate(isoStr);
+      return d ? d.toLocaleString() : "";
+    }
+
+    // ---- State ----
+    let ALL_TASKS = [];
+
     // Load JSON from local tasks.json
     fetch('tasks.json')
       .then(res => res.json())
-      .then(data => renderTasks(data))
+      .then(data => {
+        ALL_TASKS = Array.isArray(data) ? data : [];
+        hydrateProjects(ALL_TASKS);
+        applyFiltersAndRender();
+        wireEvents();
+      })
       .catch(err => console.error('Error loading JSON:', err));
 
-    function renderTasks(tasks) {
-      const grouped = {};
+    function hydrateProjects(tasks) {
+      const projects = new Set();
+      tasks.forEach(t => projects.add(t.project || 'No project'));
+      const holder = document.getElementById('projects');
+      holder.innerHTML = '';
+      [...projects].sort((a,b)=>a.localeCompare(b)).forEach(p => {
+        const id = `p-${p.replace(/[^a-z0-9]+/gi,'-').toLowerCase()}`;
+        const el = document.createElement('label');
+        el.className = 'chip';
+        el.innerHTML = `<input type="checkbox" class="project" value="${p}"> ${p}`;
+        holder.appendChild(el);
+      });
+      // Default: all selected
+      holder.querySelectorAll('input.project').forEach(cb => cb.checked = true);
+    }
 
+    function currentFilters() {
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      const sort = document.getElementById('sort').value;
+      const dueFilter = document.getElementById('dueFilter').value;
+      const minUrgency = parseFloat(document.getElementById('minUrgency').value);
+
+      const statuses = [...document.querySelectorAll('input.status:checked')].map(x => x.value);
+      const projects = [...document.querySelectorAll('input.project:checked')].map(x => x.value);
+
+      return { q, sort, dueFilter, minUrgency: isNaN(minUrgency) ? null : minUrgency, statuses, projects };
+    }
+
+    function applyFiltersAndRender() {
+      const f = currentFilters();
+      let tasks = ALL_TASKS.slice();
+
+      // Project filter
+      const pset = new Set(f.projects);
+      tasks = tasks.filter(t => pset.has(t.project || 'No project'));
+
+      // Status filter
+      const sset = new Set(f.statuses);
+      tasks = tasks.filter(t => sset.has(t.status || 'unknown'));
+
+      // Search
+      if (f.q) {
+        tasks = tasks.filter(t => `${t.description || ''} ${(t.project||'')}`.toLowerCase().includes(f.q));
+      }
+
+      // Min urgency
+      if (f.minUrgency !== null) {
+        tasks = tasks.filter(t => (t.urgency || 0) >= f.minUrgency);
+      }
+
+      // Due filter
+      const now = new Date();
+      if (f.dueFilter !== 'all') {
+        tasks = tasks.filter(t => {
+          const d = parseTWDate(t.due);
+          if (!d) return false;
+          if (f.dueFilter === 'today') {
+            return d.toDateString() === now.toDateString();
+          }
+          if (f.dueFilter === 'overdue') {
+            return d < now;
+          }
+          if (f.dueFilter === 'week') {
+            const in7 = new Date(now.getTime() + 7*24*3600*1000);
+            return d >= now && d <= in7;
+          }
+          return true;
+        });
+      }
+
+      // Sort
+      tasks.sort((a,b) => {
+        if (f.sort === 'urgency-desc') return (b.urgency||0) - (a.urgency||0);
+        if (f.sort === 'due-asc') {
+          const ad = parseTWDate(a.due) || new Date(8640000000000000); // far future
+          const bd = parseTWDate(b.due) || new Date(8640000000000000);
+          return ad - bd;
+        }
+        if (f.sort === 'entry-desc') {
+          const ad = parseTWDate(a.entry) || 0;
+          const bd = parseTWDate(b.entry) || 0;
+          return bd - ad;
+        }
+        return 0;
+      });
+
+      renderTasks(tasks);
+    }
+
+    function wireEvents() {
+      document.getElementById('q').addEventListener('input', applyFiltersAndRender);
+      document.getElementById('sort').addEventListener('change', applyFiltersAndRender);
+      document.getElementById('dueFilter').addEventListener('change', applyFiltersAndRender);
+      document.getElementById('minUrgency').addEventListener('input', applyFiltersAndRender);
+      document.querySelectorAll('input.status').forEach(cb => cb.addEventListener('change', applyFiltersAndRender));
+      document.getElementById('projects').addEventListener('change', e => {
+        if (e.target.matches('input.project')) applyFiltersAndRender();
+      });
+      document.getElementById('reset').addEventListener('click', () => {
+        document.getElementById('q').value = '';
+        document.getElementById('sort').value = 'urgency-desc';
+        document.getElementById('dueFilter').value = 'all';
+        document.getElementById('minUrgency').value = '';
+        document.querySelectorAll('input.status').forEach(cb => cb.checked = true);
+        document.querySelectorAll('input.project').forEach(cb => cb.checked = true);
+        applyFiltersAndRender();
+      });
+    }
+
+    function renderTasks(tasks) {
+      // group by status
+      const grouped = {};
       tasks.forEach(task => {
         const status = task.status || 'unknown';
         if (!grouped[status]) grouped[status] = [];
@@ -62,57 +277,75 @@
       const container = document.getElementById('tasks-container');
       container.innerHTML = '';
 
-      for (const [status, taskList] of Object.entries(grouped)) {
-        // Sort by urgency descending
-        taskList.sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
+      const statusesOrder = ['pending','completed','unknown'];
+      const keys = Object.keys(grouped).sort((a,b) => statusesOrder.indexOf(a) - statusesOrder.indexOf(b));
+
+      if (keys.length === 0) {
+        container.innerHTML = '<div class="empty">No tasks match the current filters.</div>';
+        return;
+      }
+
+      keys.forEach(status => {
+        const taskList = grouped[status];
 
         const groupDiv = document.createElement('div');
         groupDiv.className = 'status-group';
 
-        const header = document.createElement('h2');
-        header.textContent = `${status.toUpperCase()} (${taskList.length})`;
-        groupDiv.appendChild(header);
+        const title = document.createElement('div');
+        title.className = 'status-title';
+        title.innerHTML = `<h2>${status.toUpperCase()}</h2><span class="count">${taskList.length}</span>`;
+        groupDiv.appendChild(title);
 
         taskList.forEach(task => {
           const taskDiv = document.createElement('div');
-          taskDiv.className = 'task';
+          const dueDate = parseTWDate(task.due);
+          const overdue = dueDate && dueDate < new Date() && (task.status !== 'completed');
+          taskDiv.className = 'task' + (overdue ? ' overdue' : '');
 
           const desc = document.createElement('div');
-          desc.textContent = task.description;
+          desc.className = 'desc';
+          desc.textContent = task.description || '(no description)';
           taskDiv.appendChild(desc);
+
+          const urgency = document.createElement('span');
+          urgency.className = 'urgency';
+          const u = (typeof task.urgency === 'number') ? task.urgency.toFixed(2) : '0.00';
+          urgency.textContent = `Urgency: ${u}`;
+          taskDiv.appendChild(urgency);
 
           const meta = document.createElement('div');
           meta.className = 'meta';
 
           const project = document.createElement('span');
-          project.className = 'project';
+          project.className = 'badge';
           project.textContent = task.project || 'No project';
+          meta.appendChild(project);
 
-          const urgency = document.createElement('span');
-          urgency.className = 'urgency';
-          urgency.textContent = `Urgency: ${task.urgency?.toFixed(2) || '0.00'}`;
-
-          const due = document.createElement('div');
-          due.className = 'due';
           if (task.due) {
+            const due = document.createElement('span');
+            due.className = 'due-txt' + (overdue ? ' overdue' : '');
             due.textContent = `Due: ${formatDate(task.due)}`;
+            meta.appendChild(due);
           }
 
-          taskDiv.appendChild(project);
-          taskDiv.appendChild(urgency);
-          if (task.due) taskDiv.appendChild(due);
+          if (task.entry) {
+            const entry = document.createElement('span');
+            entry.textContent = `Added: ${formatDate(task.entry)}`;
+            meta.appendChild(entry);
+          }
 
+          if (task.end && status === 'completed') {
+            const ended = document.createElement('span');
+            ended.textContent = `Completed: ${formatDate(task.end)}`;
+            meta.appendChild(ended);
+          }
+
+          taskDiv.appendChild(meta);
           groupDiv.appendChild(taskDiv);
         });
 
         container.appendChild(groupDiv);
-      }
-    }
-
-    function formatDate(isoStr) {
-      // Format TaskWarrior datetime (e.g., "20250818T170000Z")
-      const date = new Date(isoStr);
-      return date.toLocaleString();
+      });
     }
   </script>
 </body>
